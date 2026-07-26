@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prism Mod Folders",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "folders"
+  ],
+  "properties": {
+    "formatVersion": {
+      "const": 1
+    },
+    "folders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/folder"
+      }
+    }
+  },
+  "$defs": {
+    "folder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "mods"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "mods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "formatVersion": 1,
+  "folders": [
+    {
+      "name": "Optimization",
+      "mods": [
+        "sodium-fabric-0.6.13+mc1.21.5.jar",
+        "lithium-fabric-mc1.21.5-0.16.2.jar"
+      ]
+    },
+    {
+      "name": "Graphics",
+      "mods": [
+        "iris-fabric-1.8.8+mc1.21.5.jar",
+        "continuity-3.0.0+1.21.5.jar"
+      ]
+    },
+    {
+      "name": "Libraries",
+      "mods": []
+    }
+  ]
+}
