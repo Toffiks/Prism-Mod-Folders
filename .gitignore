@@ -67,3 +67,4 @@ flatbuild
 /patcher/dist/
 *.pdb
 *.ilk
+release-artifacts/

@@ -5,9 +5,9 @@ Virtual, shareable mod folders for the Prism Launcher Mods page.
 ![Prism Mod Folders preview](docs/images/preview.png)
 
 Prism Mod Folders is an unofficial source modification for Prism Launcher. It
-groups mods visually without moving, renaming, or changing any JAR files. A
-small Windows patcher applies the modification to a supported official
-`prismlauncher.exe` and keeps a verified backup for restoration.
+groups mods visually without moving, renaming, or changing any JAR files.
+Windows uses a small patcher for a supported official `prismlauncher.exe`;
+Linux uses a standalone x86_64 AppImage.
 
 [Русская версия](README.ru.md)
 
@@ -28,10 +28,12 @@ small Windows patcher applies the modification to a supported official
 Folders are purely visual. Every mod remains directly inside the instance
 `mods` directory.
 
-## Compatibility
+## Downloads and compatibility
 
-The current patcher supports only the official Windows x64 build of Prism
-Launcher 11.0.3:
+- **Windows x64:** patcher for the official Prism Launcher 11.0.3 executable.
+- **Linux x86_64:** standalone AppImage (beta) for common distributions.
+
+The Windows patcher accepts these exact executable hashes:
 
 ```text
 Official SHA-256:
@@ -43,7 +45,11 @@ E91DDEB27A1679F91F2FB10DC391CFC13EFF76DA7D0FF115C77C48D3274128A0
 
 Unknown or previously modified executables are rejected without being changed.
 
-## Installation
+The Linux AppImage is built and tested automatically on Ubuntu. Its startup
+smoke test passes, but right-button drag-and-drop and wheel scrolling still
+need testing on real X11 and Wayland desktops.
+
+## Windows installation
 
 1. Download `PrismModFoldersPatcher-11.0.3.exe` from the latest GitHub
    release.
@@ -57,6 +63,22 @@ verified official executable.
 
 The patcher changes only `prismlauncher.exe`. It does not access Prism
 instances, accounts, launcher settings, or Minecraft files.
+
+## Linux x86_64 installation (beta)
+
+1. Download `PrismModFolders-Linux-x86_64.AppImage` from the Linux beta
+   GitHub release.
+2. Make it executable and launch it:
+
+```bash
+chmod +x PrismModFolders-Linux-x86_64.AppImage
+./PrismModFolders-Linux-x86_64.AppImage
+```
+
+The AppImage uses Prism's normal Linux data directory, so existing instances
+and settings remain in place. Keep your existing launcher installed until the
+beta has been tested on your desktop. The AppImage does not patch or overwrite
+another Prism Launcher installation.
 
 ## Portable folder format
 
