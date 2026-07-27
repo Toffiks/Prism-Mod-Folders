@@ -1,16 +1,17 @@
-# Prism Mod Folders v0.1.0
+# Prism Mod Folders v0.1.1
 
-First public beta for Prism Launcher 11.0.3 on Windows x64.
+Bug-fix update for Prism Launcher 11.0.3 on Windows x64.
 
-## Highlights
+## Fixed
 
-- Virtual folders on the Mods page.
-- Right-button drag and drop with normal left-click selection.
-- Mouse-wheel scrolling during drag.
-- Per-folder sorting using existing Prism columns.
-- Readable and shareable `.minecraft/modfolders.json`.
-- Russian and English patcher interface.
-- Verified backup and one-click restoration of the official executable.
+- Centered folder separators with equal spacing above and below the line.
+- Mods can now be moved out of a folder by dropping anywhere on an ungrouped
+  mod row or in the empty ungrouped-list area. Precise aiming at the insertion
+  line is no longer required.
+
+All features from v0.1.0 remain available, including right-button drag and
+drop, mouse-wheel scrolling during drag, per-folder sorting, readable
+`.minecraft/modfolders.json`, and Russian/English patcher UI.
 
 ## Installation
 

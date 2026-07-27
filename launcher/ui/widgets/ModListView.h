@@ -38,6 +38,6 @@ class ModListView : public QTreeView {
     void drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
    private:
-    QModelIndex modFolderDropTargetAt(const QPoint& position) const;
+    bool modFolderDropTargetAt(const QPoint& position, QModelIndex* targetFolder) const;
 
 };

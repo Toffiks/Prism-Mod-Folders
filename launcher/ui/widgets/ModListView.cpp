@@ -25,6 +25,7 @@
 #include <QFontMetrics>
 #include <QHeaderView>
 #include <QIcon>
+#include <QLineF>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -246,8 +247,9 @@ void ModListView::drawRow(QPainter* painter, const QStyleOptionViewItem& option,
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     constexpr int horizontalPadding = 8;
-    painter->drawLine(separatorRect.left() + horizontalPadding, separatorRect.center().y(),
-                      separatorRect.right() - horizontalPadding, separatorRect.center().y());
+    const qreal separatorY = separatorRect.top() + separatorRect.height() / 2.0;
+    painter->drawLine(QLineF(separatorRect.left() + horizontalPadding, separatorY,
+                             separatorRect.right() - horizontalPadding, separatorY));
     painter->restore();
 }
 
@@ -392,8 +394,9 @@ void ModListView::contextMenuEvent(QContextMenuEvent* event)
 void ModListView::dragMoveEvent(QDragMoveEvent* event)
 {
     QTreeView::dragMoveEvent(event);
+    QModelIndex targetFolder;
     if (event->mimeData()->hasFormat(ModFolderProxyModel::MimeType) &&
-        modFolderDropTargetAt(event->position().toPoint()).isValid()) {
+        modFolderDropTargetAt(event->position().toPoint(), &targetFolder)) {
         event->setDropAction(Qt::MoveAction);
         event->accept();
     }
@@ -402,8 +405,9 @@ void ModListView::dragMoveEvent(QDragMoveEvent* event)
 void ModListView::dropEvent(QDropEvent* event)
 {
     if (event->mimeData()->hasFormat(ModFolderProxyModel::MimeType)) {
-        const auto folder = modFolderDropTargetAt(event->position().toPoint());
-        if (folder.isValid() && model()->dropMimeData(event->mimeData(), Qt::MoveAction, -1, -1, folder)) {
+        QModelIndex targetFolder;
+        if (modFolderDropTargetAt(event->position().toPoint(), &targetFolder) &&
+            model()->dropMimeData(event->mimeData(), Qt::MoveAction, -1, -1, targetFolder)) {
             event->setDropAction(Qt::MoveAction);
             event->accept();
             return;
@@ -412,15 +416,30 @@ void ModListView::dropEvent(QDropEvent* event)
     QTreeView::dropEvent(event);
 }
 
-QModelIndex ModListView::modFolderDropTargetAt(const QPoint& position) const
+bool ModListView::modFolderDropTargetAt(const QPoint& position, QModelIndex* targetFolder) const
 {
-    auto hovered = indexAt(position);
+    if (!targetFolder || !viewport()->rect().contains(position)) {
+        return false;
+    }
+
+    *targetFolder = {};
+    const auto hovered = indexAt(position);
     if (!hovered.isValid()) {
-        return {};
+        // Empty viewport space represents the ungrouped root list.
+        return true;
     }
     if (hovered.data(ModFolderProxyModel::FolderRole).toBool()) {
-        return hovered.siblingAtColumn(0);
+        *targetFolder = hovered.siblingAtColumn(0);
+        return true;
     }
+
     const auto parent = hovered.parent();
-    return parent.data(ModFolderProxyModel::FolderRole).toBool() ? parent.siblingAtColumn(0) : QModelIndex();
+    if (parent.data(ModFolderProxyModel::FolderRole).toBool()) {
+        *targetFolder = parent.siblingAtColumn(0);
+        return true;
+    }
+
+    // A root-level mod or separator represents the ungrouped list. Passing an
+    // invalid parent to ModFolderProxyModel::dropMimeData unassigns the mod.
+    return !parent.isValid();
 }

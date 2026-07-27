@@ -110,7 +110,7 @@ class ModFolderProxyModelTest : public QObject {
         for (const int row : { 1, 3 }) {
             const auto separator = grouped.index(row, 0);
             QVERIFY(grouped.isSeparator(separator));
-            QCOMPARE(separator.data(Qt::SizeHintRole).toSize(), QSize(-1, 10));
+            QCOMPARE(separator.data(Qt::SizeHintRole).toSize(), QSize(-1, 12));
             QVERIFY(separator.data(Qt::DisplayRole).toString().isEmpty());
             QCOMPARE(grouped.flags(separator), Qt::NoItemFlags);
         }

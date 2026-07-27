@@ -177,7 +177,7 @@ QVariant ModFolderProxyModel::data(const QModelIndex& index, int role) const
             return true;
         }
         if (role == Qt::SizeHintRole) {
-            return QSize(-1, 10);
+            return QSize(-1, 12);
         }
         return {};
     }
