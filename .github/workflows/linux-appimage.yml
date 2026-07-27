@@ -1,0 +1,136 @@
+name: Linux x86_64 AppImage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      ARTIFACT_NAME: Linux-x86_64-Qt6
+      BUILD_PLATFORM: official
+      BUILD_TYPE: Release
+      QT_VERSION: 6.10.2
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install \
+            dpkg-dev \
+            ninja-build extra-cmake-modules pkg-config scdoc \
+            cmark gamemode-dev libarchive-dev libcmark-dev libqrencode-dev zlib1g-dev \
+            libxcb-cursor-dev libtomlplusplus-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: "==3.1.*"
+          version: ${{ env.QT_VERSION }}
+          modules: qtimageformats qtnetworkauth
+          cache: true
+
+      - name: Install AppImage tools
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$HOME/bin"
+          gh release download \
+            --repo VHSgunzo/sharun \
+            --pattern "sharun-x86_64-aio" \
+            --output "$HOME/bin/sharun"
+          gh release download continuous \
+            --repo DioEgizio/go-appimage \
+            --pattern "mkappimage-*-x86_64.AppImage" \
+            --output "$HOME/bin/mkappimage"
+          gh release download \
+            --repo AppImageCommunity/AppImageUpdate \
+            --pattern "AppImageUpdate-x86_64.AppImage" \
+            --output "$HOME/bin/AppImageUpdate.AppImage"
+          chmod +x "$HOME/bin"/*
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux --config "$BUILD_TYPE" --parallel 4
+
+      - name: Run tests
+        shell: bash
+        run: ctest --preset linux --build-config "$BUILD_TYPE"
+
+      - name: Prepare AppDir
+        shell: bash
+        run: |
+          rm -rf "$QT_PLUGIN_PATH"/printsupport
+          rm -rf "$QT_PLUGIN_PATH"/sqldrivers
+          rm -rf "$QT_PLUGIN_PATH"/help
+          rm -rf "$QT_PLUGIN_PATH"/designer
+          rm -rf "$QT_PLUGIN_PATH"/qmltooling
+          rm -rf "$QT_PLUGIN_PATH"/qmlls
+          rm -rf "$QT_PLUGIN_PATH"/qmllint
+          rm -rf "$QT_PLUGIN_PATH"/platformthemes/libqgtk3.so
+
+          cmake --install build --config "$BUILD_TYPE" --prefix install-appdir
+
+          sharun lib4bin \
+            --hard-links \
+            --with-hooks \
+            --dst-dir install-appdir \
+            install-appdir/bin/* "$QT_PLUGIN_PATH"/*/*.so
+
+          cp "$HOME/bin/AppImageUpdate.AppImage" install-appdir/bin/
+          find install-appdir -name '*gamemode*' -exec rm {} +
+
+          echo "PRISMLAUNCHER_DISABLE_GLVULKAN=1" >> install-appdir/.env
+          echo "QT_QPA_PLATFORMTHEME=xdgdesktopportal" >> install-appdir/.env
+          ln -s org.prismlauncher.PrismLauncher.metainfo.xml \
+            install-appdir/share/metainfo/org.prismlauncher.PrismLauncher.appdata.xml
+          ln -s share/applications/org.prismlauncher.PrismLauncher.desktop install-appdir/
+          ln -s share/icons/hicolor/256x256/apps/org.prismlauncher.PrismLauncher.png install-appdir/
+          mv install-appdir/sharun install-appdir/AppRun
+
+      - name: Build AppImage
+        shell: bash
+        run: |
+          mkappimage \
+            --updateinformation \
+            "gh-releases-zsync|${{ github.repository_owner }}|${{ github.event.repository.name }}|latest|PrismModFolders-Linux-x86_64.AppImage.zsync" \
+            install-appdir \
+            PrismModFolders-Linux-x86_64.AppImage
+          chmod +x PrismModFolders-Linux-x86_64.AppImage
+
+      - name: Smoke test AppImage
+        shell: bash
+        run: |
+          ./PrismModFolders-Linux-x86_64.AppImage --appimage-extract >/dev/null
+          QT_QPA_PLATFORM=offscreen timeout 20s ./squashfs-root/AppRun --version
+          sha256sum PrismModFolders-Linux-x86_64.AppImage \
+            > PrismModFolders-Linux-x86_64.AppImage.sha256
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrismModFolders-Linux-x86_64-AppImage
+          if-no-files-found: error
+          path: |
+            PrismModFolders-Linux-x86_64.AppImage
+            PrismModFolders-Linux-x86_64.AppImage.zsync
+            PrismModFolders-Linux-x86_64.AppImage.sha256
