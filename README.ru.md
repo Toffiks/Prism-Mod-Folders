@@ -11,9 +11,6 @@
 | Windows x64 · Prism Launcher 11.0.3 | **[Скачать Windows-патчер (.exe)](https://github.com/Toffiks/Prism-Mod-Folders/releases/download/v0.1.1/PrismModFoldersPatcher-11.0.3.exe)** | Закрыть Prism, запустить файл и нажать **Установить папки модов**. |
 | Linux x86_64 · beta | **[Скачать Linux AppImage](https://github.com/Toffiks/Prism-Mod-Folders/releases/download/v0.2.0-beta.1/PrismModFolders-Linux-x86_64.AppImage)** | Один раз разрешить выполнение и открыть файл. |
 
-Клонировать репозиторий и нажимать зелёную кнопку
-**Code → Download ZIP** не нужно. Там находятся исходники для разработчиков.
-Для установки Prism Mod Folders нужен только один файл по ссылке выше.
 
 Prism Mod Folders — неофициальная модификация исходников Prism Launcher. Она
 группирует моды только визуально: JAR-файлы не перемещаются, не переименовываются
