@@ -3,8 +3,10 @@
 The single-file Windows patcher adds Prism Mod Folders to an existing supported
 Prism Launcher installation.
 
-The current executable is approximately 1.56 MB and contains a compressed
-binary delta, not a complete `prismlauncher.exe`.
+The current executable is approximately 3.3 MB and contains a transparent,
+uncompressed binary-command delta, not a complete `prismlauncher.exe`. The
+delta remains compact by referencing unchanged ranges of the official
+executable.
 
 ## Safety model
 
@@ -48,3 +50,7 @@ Self-test without modifying the source executable:
 PrismModFoldersPatcher-11.0.3.exe `
   --self-test official-prismlauncher.exe reconstructed.exe
 ```
+
+Delta format v2 intentionally stores commands without Deflate compression. It
+produces the same verified patched executable while avoiding false-positive
+machine-learning detections caused by the compressed v1 resource.

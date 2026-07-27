@@ -19,9 +19,18 @@ internal static class BinaryDeltaBuilder
 
     private static int Main(string[] args)
     {
+        if (args.Length == 4 && String.Equals(args[0], "--apply", StringComparison.OrdinalIgnoreCase))
+        {
+            Apply(args[1], args[2], args[3]);
+            Console.WriteLine("outputSha256={0}", Sha256(args[3]));
+            return 0;
+        }
+
         if (args.Length != 3)
         {
-            Console.Error.WriteLine("Usage: BinaryDeltaBuilder OLD NEW OUTPUT");
+            Console.Error.WriteLine("Usage:");
+            Console.Error.WriteLine("  BinaryDeltaBuilder OLD NEW OUTPUT");
+            Console.Error.WriteLine("  BinaryDeltaBuilder --apply OLD PATCH OUTPUT");
             return 2;
         }
 
@@ -45,14 +54,10 @@ internal static class BinaryDeltaBuilder
         using (FileStream output = new FileStream(args[2], FileMode.Create, FileAccess.Write, FileShare.None))
         using (BinaryWriter header = new BinaryWriter(output))
         {
-            header.Write(new byte[] { (byte)'P', (byte)'M', (byte)'F', (byte)'D', (byte)'L', (byte)'T', (byte)'1', 0 });
+            header.Write(new byte[] { (byte)'P', (byte)'M', (byte)'F', (byte)'D', (byte)'L', (byte)'T', (byte)'2', 0 });
             header.Write((long)newBytes.Length);
             header.Write(commands.Length);
-            header.Flush();
-            using (DeflateStream compressed = new DeflateStream(output, CompressionMode.Compress, true))
-            {
-                compressed.Write(commands, 0, commands.Length);
-            }
+            header.Write(commands);
         }
 
         Verify(args[0], args[1], args[2]);
@@ -241,44 +246,61 @@ internal static class BinaryDeltaBuilder
         using (FileStream output = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             byte[] magic = header.ReadBytes(8);
-            if (magic.Length != 8 || magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'F' || magic[3] != 'D' ||
-                magic[4] != 'L' || magic[5] != 'T' || magic[6] != '1' || magic[7] != 0)
+            bool compressedV1 =
+                magic.Length == 8 && magic[0] == 'P' && magic[1] == 'M' && magic[2] == 'F' && magic[3] == 'D' &&
+                magic[4] == 'L' && magic[5] == 'T' && magic[6] == '1' && magic[7] == 0;
+            bool rawV2 =
+                magic.Length == 8 && magic[0] == 'P' && magic[1] == 'M' && magic[2] == 'F' && magic[3] == 'D' &&
+                magic[4] == 'L' && magic[5] == 'T' && magic[6] == '2' && magic[7] == 0;
+            if (!compressedV1 && !rawV2)
             {
                 throw new InvalidDataException("Invalid delta header.");
             }
             long expectedLength = header.ReadInt64();
             int commandLength = header.ReadInt32();
 
-            using (DeflateStream compressed = new DeflateStream(patch, CompressionMode.Decompress, true))
-            using (BinaryReader commands = new BinaryReader(compressed))
+            Stream commandStream = compressedV1
+                ? (Stream)new DeflateStream(patch, CompressionMode.Decompress, true)
+                : patch;
+            try
             {
-                int consumed = 0;
-                byte[] buffer = new byte[1024 * 1024];
-                while (consumed < commandLength)
+                using (BinaryReader commands = new BinaryReader(commandStream, System.Text.Encoding.UTF8, true))
                 {
-                    byte command = commands.ReadByte();
-                    ++consumed;
-                    if (command == 0)
+                    int consumed = 0;
+                    byte[] buffer = new byte[1024 * 1024];
+                    while (consumed < commandLength)
                     {
-                        break;
+                        byte command = commands.ReadByte();
+                        ++consumed;
+                        if (command == 0)
+                        {
+                            break;
+                        }
+                        if (command == 1)
+                        {
+                            int offset = commands.ReadInt32();
+                            int count = commands.ReadInt32();
+                            consumed += 8;
+                            CopySource(source, output, offset, count, buffer);
+                        }
+                        else if (command == 2)
+                        {
+                            int count = commands.ReadInt32();
+                            consumed += 4 + count;
+                            CopyExact(commands.BaseStream, output, count, buffer);
+                        }
+                        else
+                        {
+                            throw new InvalidDataException("Unknown delta command.");
+                        }
                     }
-                    if (command == 1)
-                    {
-                        int offset = commands.ReadInt32();
-                        int count = commands.ReadInt32();
-                        consumed += 8;
-                        CopySource(source, output, offset, count, buffer);
-                    }
-                    else if (command == 2)
-                    {
-                        int count = commands.ReadInt32();
-                        consumed += 4 + count;
-                        CopyExact(commands.BaseStream, output, count, buffer);
-                    }
-                    else
-                    {
-                        throw new InvalidDataException("Unknown delta command.");
-                    }
+                }
+            }
+            finally
+            {
+                if (compressedV1)
+                {
+                    commandStream.Dispose();
                 }
             }
             if (output.Length != expectedLength)

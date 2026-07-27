@@ -8,7 +8,7 @@ Virtual, shareable mod folders for the Prism Launcher Mods page.
 
 | System | Download | What to do |
 | --- | --- | --- |
-| Windows x64 · Prism Launcher 11.0.3 | **[Download the Windows patcher (.exe)](https://github.com/Toffiks/Prism-Mod-Folders/releases/download/v0.1.1/PrismModFoldersPatcher-11.0.3.exe)** | Close Prism, run the file, and select **Install Mod Folders**. |
+| Windows x64 · Prism Launcher 11.0.3 | **[Download the Windows patcher (.exe)](https://github.com/Toffiks/Prism-Mod-Folders/releases/download/v0.1.2/PrismModFoldersPatcher-11.0.3.exe)** | Close Prism, run the file, and select **Install Mod Folders**. |
 | Linux x86_64 · beta | **[Download the Linux AppImage](https://github.com/Toffiks/Prism-Mod-Folders/releases/download/v0.2.0-beta.1/PrismModFolders-Linux-x86_64.AppImage)** | Allow execution once, then open the file. |
 
 Prism Mod Folders is an unofficial source modification for Prism Launcher. It

@@ -84,8 +84,13 @@ internal static class PatchEngine
         using (FileStream output = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             byte[] magic = header.ReadBytes(8);
-            if (magic.Length != 8 || magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'F' || magic[3] != 'D' ||
-                magic[4] != 'L' || magic[5] != 'T' || magic[6] != '1' || magic[7] != 0)
+            bool compressedV1 =
+                magic.Length == 8 && magic[0] == 'P' && magic[1] == 'M' && magic[2] == 'F' && magic[3] == 'D' &&
+                magic[4] == 'L' && magic[5] == 'T' && magic[6] == '1' && magic[7] == 0;
+            bool rawV2 =
+                magic.Length == 8 && magic[0] == 'P' && magic[1] == 'M' && magic[2] == 'F' && magic[3] == 'D' &&
+                magic[4] == 'L' && magic[5] == 'T' && magic[6] == '2' && magic[7] == 0;
+            if (!compressedV1 && !rawV2)
             {
                 throw new InvalidDataException(UiText.Get(
                     "Неверный заголовок встроенного delta-патча.",
@@ -101,69 +106,81 @@ internal static class PatchEngine
                     "The embedded delta patch contains invalid sizes."));
             }
 
-            using (DeflateStream compressed = new DeflateStream(delta, CompressionMode.Decompress, true))
-            using (BinaryReader commands = new BinaryReader(compressed, Encoding.UTF8, true))
+            Stream commandStream = compressedV1
+                ? (Stream)new DeflateStream(delta, CompressionMode.Decompress, true)
+                : delta;
+            try
             {
-                int consumed = 0;
-                bool ended = false;
-                byte[] buffer = new byte[1024 * 1024];
-
-                while (consumed < commandLength)
+                using (BinaryReader commands = new BinaryReader(commandStream, Encoding.UTF8, true))
                 {
-                    byte command = commands.ReadByte();
-                    ++consumed;
-                    if (command == 0)
-                    {
-                        ended = true;
-                        break;
-                    }
+                    int consumed = 0;
+                    bool ended = false;
+                    byte[] buffer = new byte[1024 * 1024];
 
-                    if (command == 1)
+                    while (consumed < commandLength)
                     {
-                        int offset = commands.ReadInt32();
-                        int count = commands.ReadInt32();
-                        consumed = CheckedAdd(consumed, 8);
-                        if (offset < 0 || count <= 0 || (long)offset + count > source.Length)
+                        byte command = commands.ReadByte();
+                        ++consumed;
+                        if (command == 0)
+                        {
+                            ended = true;
+                            break;
+                        }
+
+                        if (command == 1)
+                        {
+                            int offset = commands.ReadInt32();
+                            int count = commands.ReadInt32();
+                            consumed = CheckedAdd(consumed, 8);
+                            if (offset < 0 || count <= 0 || (long)offset + count > source.Length)
+                            {
+                                throw new InvalidDataException(UiText.Get(
+                                    "Delta-патч ссылается за пределы исходного файла.",
+                                    "The delta patch references data outside the source file."));
+                            }
+                            source.Position = offset;
+                            CopyExact(source, output, count, buffer);
+                        }
+                        else if (command == 2)
+                        {
+                            int count = commands.ReadInt32();
+                            if (count <= 0)
+                            {
+                                throw new InvalidDataException(UiText.Get(
+                                    "Некорректная literal-команда delta-патча.",
+                                    "The delta patch contains an invalid literal command."));
+                            }
+                            consumed = CheckedAdd(consumed, CheckedAdd(4, count));
+                            CopyExact(commands.BaseStream, output, count, buffer);
+                        }
+                        else
                         {
                             throw new InvalidDataException(UiText.Get(
-                                "Delta-патч ссылается за пределы исходного файла.",
-                                "The delta patch references data outside the source file."));
+                                "Неизвестная команда delta-патча.",
+                                "The delta patch contains an unknown command."));
                         }
-                        source.Position = offset;
-                        CopyExact(source, output, count, buffer);
-                    }
-                    else if (command == 2)
-                    {
-                        int count = commands.ReadInt32();
-                        if (count <= 0)
+
+                        if (consumed > commandLength || output.Length > expectedLength)
                         {
                             throw new InvalidDataException(UiText.Get(
-                                "Некорректная literal-команда delta-патча.",
-                                "The delta patch contains an invalid literal command."));
+                                "Повреждённый delta-патч.",
+                                "The delta patch is corrupted."));
                         }
-                        consumed = CheckedAdd(consumed, CheckedAdd(4, count));
-                        CopyExact(commands.BaseStream, output, count, buffer);
-                    }
-                    else
-                    {
-                        throw new InvalidDataException(UiText.Get(
-                            "Неизвестная команда delta-патча.",
-                            "The delta patch contains an unknown command."));
                     }
 
-                    if (consumed > commandLength || output.Length > expectedLength)
+                    if (!ended || consumed != commandLength)
                     {
                         throw new InvalidDataException(UiText.Get(
-                            "Повреждённый delta-патч.",
-                            "The delta patch is corrupted."));
+                            "Delta-патч закончился неожиданно.",
+                            "The delta patch ended unexpectedly."));
                     }
                 }
-
-                if (!ended || consumed != commandLength)
+            }
+            finally
+            {
+                if (compressedV1)
                 {
-                    throw new InvalidDataException(UiText.Get(
-                        "Delta-патч закончился неожиданно.",
-                        "The delta patch ended unexpectedly."));
+                    commandStream.Dispose();
                 }
             }
 
