@@ -101,6 +101,8 @@ class ModFolderPage : public ExternalResourcesPage {
     QAction* m_renameFolderAction = nullptr;
     QSet<QString> m_expandedFolders;
     bool m_folderModelResetting = false;
+    bool m_folderRestorePending = false;
+    int m_folderScrollPosition = 0;
 };
 
 class CoreModFolderPage : public ModFolderPage {

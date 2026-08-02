@@ -53,6 +53,7 @@
 #include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSortFilterProxyModel>
 #include <QTimer>
 #include <QTreeView>
@@ -140,6 +141,7 @@ ModFolderPage::ModFolderPage(BaseInstance* inst, ModFolderModel* model, QWidget*
     m_folderProxy = new ModFolderProxyModel(m_filterModel, m_model, m_folderStorage.get(), this);
     connect(m_folderProxy, &ModFolderProxyModel::storageError, this,
             [this](const QString& error) { QMessageBox::warning(this, tr("Mod Folders"), error); });
+    connect(ui->filterEdit, &QLineEdit::textChanged, m_folderProxy, &ModFolderProxyModel::rebuild);
 
     setViewModel(m_folderProxy);
     m_model->loadColumns(ui->treeView);
@@ -167,12 +169,24 @@ ModFolderPage::ModFolderPage(BaseInstance* inst, ModFolderModel* model, QWidget*
             m_expandedFolders.remove(m_folderProxy->folderName(index));
         }
     });
-    connect(m_folderProxy, &QAbstractItemModel::modelAboutToBeReset, this, [this] { m_folderModelResetting = true; });
+    connect(m_folderProxy, &QAbstractItemModel::modelAboutToBeReset, this, [this] {
+        if (!m_folderModelResetting) {
+            m_folderScrollPosition = ui->treeView->verticalScrollBar()->value();
+        }
+        m_folderModelResetting = true;
+    });
     connect(m_folderProxy, &QAbstractItemModel::modelReset, this,
             [this] {
+                if (m_folderRestorePending) {
+                    return;
+                }
+                m_folderRestorePending = true;
                 QTimer::singleShot(0, this, [this] {
                     restoreExpandedFolders();
+                    auto* scrollBar = ui->treeView->verticalScrollBar();
+                    scrollBar->setValue(qMin(m_folderScrollPosition, scrollBar->maximum()));
                     m_folderModelResetting = false;
+                    m_folderRestorePending = false;
                 });
             });
 

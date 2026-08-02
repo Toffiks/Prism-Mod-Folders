@@ -170,6 +170,64 @@ class ModFolderProxyModelTest : public QObject {
         verifyPartition();
     }
 
+    void searchHidesIrrelevantFolders()
+    {
+        QTemporaryDir temporaryDir;
+        QVERIFY(temporaryDir.isValid());
+
+        const auto alpha = temporaryDir.filePath("alpha.jar");
+        const auto beta = temporaryDir.filePath("beta.jar");
+        const auto gamma = temporaryDir.filePath("gamma.jar");
+        createFile(alpha);
+        createFile(beta);
+        createFile(gamma);
+
+        TestModFolderModel model(QDir(temporaryDir.path()));
+        model.appendMod(alpha);
+        model.appendMod(beta);
+        model.appendMod(gamma);
+
+        std::unique_ptr<QSortFilterProxyModel> sorted(model.createFilterProxyModel());
+        sorted->setDynamicSortFilter(true);
+        sorted->setFilterCaseSensitivity(Qt::CaseInsensitive);
+        sorted->setFilterKeyColumn(-1);
+        sorted->setSourceModel(&model);
+
+        ModFolderStorage storage(temporaryDir.filePath("modfolders.json"));
+        QVERIFY(storage.createFolder("Optimization"));
+        QVERIFY(storage.createFolder("Graphics"));
+        QVERIFY(storage.createFolder("Folder Match"));
+        QVERIFY(storage.assignMods("Optimization", { "alpha.jar" }));
+        QVERIFY(storage.assignMods("Graphics", { "beta.jar" }));
+
+        ModFolderProxyModel grouped(sorted.get(), &model, &storage);
+
+        sorted->setFilterRegularExpression("alpha");
+        grouped.rebuild();
+        QCOMPARE(grouped.rowCount(), 2);
+        const auto optimization = grouped.index(0, 0);
+        QVERIFY(grouped.isFolder(optimization));
+        QCOMPARE(grouped.folderName(optimization), QString("Optimization"));
+        QCOMPARE(actualFiles(grouped, optimization), QStringList({ "alpha.jar" }));
+
+        sorted->setFilterRegularExpression("folder match");
+        grouped.rebuild();
+        QCOMPARE(grouped.rowCount(), 2);
+        const auto folderMatch = grouped.index(0, 0);
+        QVERIFY(grouped.isFolder(folderMatch));
+        QCOMPARE(grouped.folderName(folderMatch), QString("Folder Match"));
+        QCOMPARE(grouped.rowCount(folderMatch), 0);
+
+        sorted->setFilterRegularExpression("missing");
+        grouped.rebuild();
+        QCOMPARE(grouped.rowCount(), 0);
+
+        sorted->setFilterRegularExpression(QString());
+        grouped.rebuild();
+        QCOMPARE(grouped.rowCount(), 7);
+        QCOMPARE(grouped.modFileName(grouped.index(6, 0)), QString("gamma.jar"));
+    }
+
     void dragAndDropMovesOnlyAssignments()
     {
         QTemporaryDir temporaryDir;

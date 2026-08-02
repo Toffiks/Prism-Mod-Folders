@@ -78,5 +78,6 @@ class ModFolderProxyModel : public QAbstractProxyModel {
     ModFolderModel* m_modModel;
     ModFolderStorage* m_storage;
     QList<QList<int>> m_folderRows;
+    QList<int> m_visibleFolders;
     QList<int> m_ungroupedRows;
 };

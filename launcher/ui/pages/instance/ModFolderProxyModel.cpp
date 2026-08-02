@@ -10,8 +10,10 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPixmap>
+#include <QRegularExpression>
 #include <QSet>
 #include <QSize>
+#include <QSortFilterProxyModel>
 
 #include <algorithm>
 #include <utility>
@@ -65,8 +67,11 @@ ModFolderProxyModel::ModFolderProxyModel(QAbstractItemModel* sortedModModel,
                 }
                 if (roles.isEmpty() || roles.contains(Qt::DisplayRole) || roles.contains(Qt::DecorationRole)) {
                     for (int folder = 0; folder < m_storage->folders().size(); ++folder) {
-                        const auto image = index(folderRootRow(folder), ModFolderModel::ImageColumn);
-                        emit dataChanged(image, image, { Qt::DecorationRole });
+                        const auto row = folderRootRow(folder);
+                        if (row >= 0) {
+                            const auto image = index(row, ModFolderModel::ImageColumn);
+                            emit dataChanged(image, image, { Qt::DecorationRole });
+                        }
                     }
                 }
             });
@@ -90,8 +95,7 @@ QModelIndex ModFolderProxyModel::mapFromSource(const QModelIndex& sourceIndex) c
 
     const auto ungroupedRow = m_ungroupedRows.indexOf(sourceIndex.row());
     if (ungroupedRow >= 0) {
-        return createIndex(
-            m_storage->folders().size() * 2 + ungroupedRow, sourceIndex.column(), modId(sourceIndex.row()));
+        return createIndex(m_visibleFolders.size() * 2 + ungroupedRow, sourceIndex.column(), modId(sourceIndex.row()));
     }
     return {};
 }
@@ -111,10 +115,10 @@ QModelIndex ModFolderProxyModel::index(int row, int column, const QModelIndex& p
     }
 
     if (!parent.isValid()) {
-        const auto folderCount = m_storage->folders().size();
+        const auto folderCount = m_visibleFolders.size();
         const auto groupedRootRows = folderCount * 2;
         if (row < groupedRootRows) {
-            const auto folder = row / 2;
+            const auto folder = m_visibleFolders.at(row / 2);
             return row % 2 == 0 ? createIndex(row, column, folderId(folder))
                                 : createIndex(row, column, separatorId(folder));
         }
@@ -147,13 +151,14 @@ QModelIndex ModFolderProxyModel::parent(const QModelIndex& child) const
     if (folder < 0) {
         return {};
     }
-    return createIndex(folderRootRow(folder), 0, folderId(folder));
+    const auto row = folderRootRow(folder);
+    return row >= 0 ? createIndex(row, 0, folderId(folder)) : QModelIndex();
 }
 
 int ModFolderProxyModel::rowCount(const QModelIndex& parent) const
 {
     if (!parent.isValid()) {
-        return m_storage->folders().size() * 2 + m_ungroupedRows.size();
+        return m_visibleFolders.size() * 2 + m_ungroupedRows.size();
     }
     if (isFolder(parent) && parent.column() == 0) {
         const auto folder = folderIndex(parent);
@@ -434,6 +439,7 @@ void ModFolderProxyModel::rebuild()
 
     m_folderRows.clear();
     m_folderRows.resize(m_storage->folders().size());
+    m_visibleFolders.clear();
     m_ungroupedRows.clear();
 
     if (sourceModel()) {
@@ -447,6 +453,17 @@ void ModFolderProxyModel::rebuild()
         }
     }
 
+    const auto* filterModel = qobject_cast<const QSortFilterProxyModel*>(sourceModel());
+    const auto filterExpression = filterModel ? filterModel->filterRegularExpression() : QRegularExpression();
+    const bool filtering = !filterExpression.pattern().isEmpty();
+    for (int folder = 0; folder < m_storage->folders().size(); ++folder) {
+        const bool folderNameMatches =
+            filtering && filterExpression.match(m_storage->folders().at(folder).name).hasMatch();
+        if (!filtering || !m_folderRows.at(folder).isEmpty() || folderNameMatches) {
+            m_visibleFolders.append(folder);
+        }
+    }
+
     endResetModel();
 }
 
@@ -457,7 +474,8 @@ int ModFolderProxyModel::folderIndex(const QModelIndex& index) const
 
 int ModFolderProxyModel::folderRootRow(int folder) const
 {
-    return folder * 2;
+    const auto visibleFolder = m_visibleFolders.indexOf(folder);
+    return visibleFolder >= 0 ? visibleFolder * 2 : -1;
 }
 
 int ModFolderProxyModel::sourceRow(const QModelIndex& index) const
